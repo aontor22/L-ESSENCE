@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import InteractiveLogo from './components/InteractiveLogo';
 import ProductCard from './components/ProductCard';
@@ -6,14 +6,14 @@ import AiPerfumer from './components/AiPerfumer';
 import CartDrawer from './components/CartDrawer';
 import { Perfume, CartItem } from './types';
 
-// Updated Data with Working Images
+// Updated Data with High-Quality Studio Style Images
 const perfumes: Perfume[] = [
   {
     id: '1',
     name: 'Nocturnal Bloom',
     brand: 'L\'Essence',
     price: 185,
-    image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?auto=format&fit=crop&w=800&q=80',
     notes: ['Black Orchid', 'Amber', 'Patchouli'],
     description: 'A dark, velvety fragrance that unfolds under the moonlight. Notes of rare orchid blend with smoky amber for an intoxicating finish.',
     mood: 'Mysterious'
@@ -23,7 +23,7 @@ const perfumes: Perfume[] = [
     name: 'Golden Hour',
     brand: 'L\'Essence',
     price: 160,
-    image: 'https://images.unsplash.com/photo-1587017539504-67cfbddac569?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1594035910387-fea4779426e9?auto=format&fit=crop&w=800&q=80',
     notes: ['Bergamot', 'Saffron', 'Honey'],
     description: 'Capturing the fleeting moment of sunset. Bright citrus opens into warm saffron threads and sweet honey drizzle.',
     mood: 'Warm'
@@ -33,7 +33,7 @@ const perfumes: Perfume[] = [
     name: 'Oceanic Drift',
     brand: 'L\'Essence',
     price: 145,
-    image: 'https://images.unsplash.com/photo-1519669556878-63bdad8a1a49?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1595425970339-27d2c1256924?auto=format&fit=crop&w=800&q=80',
     notes: ['Sea Salt', 'Driftwood', 'Sage'],
     description: 'The raw power of the Atlantic. Salty air meets weathered wood and aromatic sage in this crisp, refreshing scent.',
     mood: 'Fresh'
@@ -43,7 +43,7 @@ const perfumes: Perfume[] = [
     name: 'Velvet Rose',
     brand: 'L\'Essence',
     price: 210,
-    image: 'https://images.unsplash.com/photo-1557170334-a9632e77c6e4?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=800&q=80',
     notes: ['Damask Rose', 'Oud', 'Praline'],
     description: 'A sophisticated floral with a gourmand twist. Deep red roses layered over exotic oud wood.',
     mood: 'Romantic'
@@ -53,7 +53,7 @@ const perfumes: Perfume[] = [
     name: 'Forest Rain',
     brand: 'L\'Essence',
     price: 155,
-    image: 'https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1592914610354-fd354ea45e48?auto=format&fit=crop&w=800&q=80',
     notes: ['Pine', 'Petrichor', 'Moss'],
     description: 'The scent of a pine forest after a heavy rain. Earthy, green, and profoundly grounding.',
     mood: 'Earthy'
@@ -63,7 +63,7 @@ const perfumes: Perfume[] = [
     name: 'Citrus Zest',
     brand: 'L\'Essence',
     price: 130,
-    image: 'https://images.unsplash.com/photo-1615160627252-78d1283d6614?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1616949755610-8c9bbc08f138?auto=format&fit=crop&w=800&q=80',
     notes: ['Yuzu', 'Basil', 'Vetiver'],
     description: 'An explosion of energy. Sparkling Japanese yuzu meets spicy basil for an invigorating wake-up call.',
     mood: 'Energetic'
@@ -76,6 +76,25 @@ function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   
+  // Wishlist State
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('wishlist');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+
+  const toggleWishlist = (id: string) => {
+    setWishlist(prev => {
+      const newWishlist = prev.includes(id)
+        ? prev.filter(itemId => itemId !== id)
+        : [...prev, id];
+      localStorage.setItem('wishlist', JSON.stringify(newWishlist));
+      return newWishlist;
+    });
+  };
+
   // Use scroll progress relative to the hero section for more precise control
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -111,6 +130,7 @@ function App() {
 
   // Filter Logic
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const allNotes = useMemo(() => {
     const notes = new Set<string>();
@@ -119,9 +139,24 @@ function App() {
   }, []);
 
   const filteredPerfumes = useMemo(() => {
-    if (selectedNotes.length === 0) return perfumes;
-    return perfumes.filter(p => p.notes.some(n => selectedNotes.includes(n)));
-  }, [selectedNotes]);
+    let result = perfumes;
+    
+    // Filter by Notes
+    if (selectedNotes.length > 0) {
+        result = result.filter(p => p.notes.some(n => selectedNotes.includes(n)));
+    }
+
+    // Filter by Search Query
+    if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        result = result.filter(p => 
+            p.name.toLowerCase().includes(query) || 
+            p.brand.toLowerCase().includes(query)
+        );
+    }
+    
+    return result;
+  }, [selectedNotes, searchQuery]);
 
   const toggleNote = (note: string) => {
     setSelectedNotes(prev => 
@@ -286,32 +321,50 @@ function App() {
           </p>
         </div>
 
-        {/* Filters */}
-        <div className="mb-12">
-            <div className="flex flex-wrap gap-3">
-                <button
-                    onClick={() => setSelectedNotes([])}
-                    className={`px-4 py-2 text-[10px] md:text-xs uppercase tracking-widest border transition-all duration-300 ${
-                        selectedNotes.length === 0
-                        ? 'bg-white text-black border-white'
-                        : 'bg-transparent text-gray-500 border-gray-800 hover:border-[#D4AF37] hover:text-[#D4AF37]'
-                    }`}
-                >
-                    All Notes
-                </button>
-                {allNotes.map(note => (
+        {/* Filters & Search */}
+        <div className="mb-12 flex flex-col lg:flex-row gap-8 justify-between items-start lg:items-end">
+            <div className="flex-1 w-full">
+                <h4 className="text-xs uppercase tracking-widest text-white/50 mb-4">Filter by Notes</h4>
+                <div className="flex flex-wrap gap-3">
                     <button
-                        key={note}
-                        onClick={() => toggleNote(note)}
+                        onClick={() => setSelectedNotes([])}
                         className={`px-4 py-2 text-[10px] md:text-xs uppercase tracking-widest border transition-all duration-300 ${
-                            selectedNotes.includes(note)
-                            ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
-                            : 'bg-transparent text-gray-400 border-white/10 hover:border-[#D4AF37] hover:text-[#D4AF37]'
+                            selectedNotes.length === 0
+                            ? 'bg-white text-black border-white'
+                            : 'bg-transparent text-gray-500 border-gray-800 hover:border-[#D4AF37] hover:text-[#D4AF37]'
                         }`}
                     >
-                        {note}
+                        All Notes
                     </button>
-                ))}
+                    {allNotes.map(note => (
+                        <button
+                            key={note}
+                            onClick={() => toggleNote(note)}
+                            className={`px-4 py-2 text-[10px] md:text-xs uppercase tracking-widest border transition-all duration-300 ${
+                                selectedNotes.includes(note)
+                                ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                                : 'bg-transparent text-gray-400 border-white/10 hover:border-[#D4AF37] hover:text-[#D4AF37]'
+                            }`}
+                        >
+                            {note}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            
+            <div className="w-full lg:w-72">
+                <div className="relative group">
+                    <input 
+                        type="text" 
+                        placeholder="Search collection..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-transparent border-b border-white/20 py-2 text-white placeholder-white/30 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                    />
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 absolute right-0 top-2 text-white/30 group-focus-within:text-[#D4AF37] transition-colors">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                    </svg>
+                </div>
             </div>
         </div>
 
@@ -325,6 +378,8 @@ function App() {
                       perfume={perfume} 
                       index={index} 
                       onAddToCart={addToCart}
+                      isWishlisted={wishlist.includes(perfume.id)}
+                      onToggleWishlist={() => toggleWishlist(perfume.id)}
                     />
                 ))
             ) : (
@@ -334,12 +389,12 @@ function App() {
                     exit={{ opacity: 0 }}
                     className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500"
                 >
-                    <p className="text-lg serif-text italic">No fragrances found with these specific notes.</p>
+                    <p className="text-lg serif-text italic">No fragrances found matching your criteria.</p>
                     <button 
-                        onClick={() => setSelectedNotes([])}
+                        onClick={() => {setSelectedNotes([]); setSearchQuery('');}}
                         className="mt-4 text-[#D4AF37] hover:underline text-sm uppercase tracking-widest"
                     >
-                        Clear Filters
+                        Clear All Filters
                     </button>
                 </motion.div>
             )}
